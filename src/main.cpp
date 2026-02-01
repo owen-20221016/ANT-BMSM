@@ -109,8 +109,8 @@ struct BMSData {
 BMSData bmsData;
 // ==================== 电源管理配置 ====================
 // GPIO2 用于控制继电器线圈：
-//  - LOW (继电器不吸合) -> 继电器回到 NC -> 默认使用市电 (Fail-safe)
-//  - HIGH (继电器吸合)   -> 切换到 NO -> 使用电池
+//  - HIGH (继电器不吸合) -> 继电器回到 NC -> 默认使用市电 (Fail-safe)
+//  - LOW (继电器吸合)   -> 切换到 NO -> 使用电池
 const uint8_t POWER_CONTROL_PIN = 2;
 
 // 电源模式枚举
@@ -130,8 +130,8 @@ struct PowerManager {
 };
 
 PowerManager powerMgr = {
-  .currentMode = BATTERY_MODE,
-  .lastMode = BATTERY_MODE,
+  .currentMode = AC_POWER_MODE,
+  .lastMode = AC_POWER_MODE,
   .socThresholdLow = 20,           // 电量 <= 20% 切换到市电
   .socThresholdHigh = 80,          // 电量 >= 80% 切换回电池
   .lastModeChangeTime = 0,
@@ -428,7 +428,7 @@ bool readBMSData(uint8_t* buffer, uint8_t maxLength) {
 void initPowerControl() {
   pinMode(POWER_CONTROL_PIN, OUTPUT);
   // 初始状态：继电器不吸合 -> 默认使用市电（Fail-safe）
-  digitalWrite(POWER_CONTROL_PIN, LOW);
+  digitalWrite(POWER_CONTROL_PIN, HIGH);
   powerMgr.currentMode = AC_POWER_MODE;
   powerMgr.lastMode = AC_POWER_MODE;
 }
@@ -444,11 +444,11 @@ void setPowerMode(PowerMode mode) {
   powerMgr.lastModeChangeTime = millis();
   powerMgr.modeChangeCount++;
 
-  // 注意：LOW = 继电器不吸合 -> 市电 (默认安全)
+  // 注意：HIGH = 继电器不吸合 -> 市电 (默认安全)
   if (mode == BATTERY_MODE) {
-    digitalWrite(POWER_CONTROL_PIN, HIGH); // 吸合 -> 切换到电池
+    digitalWrite(POWER_CONTROL_PIN, LOW); // 吸合 -> 切换到电池
   } else {
-    digitalWrite(POWER_CONTROL_PIN, LOW); // 释放 -> 回到市电
+    digitalWrite(POWER_CONTROL_PIN, HIGH); // 释放 -> 回到市电
   }
 }
 
