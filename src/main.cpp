@@ -20,6 +20,14 @@ ESP8266WebServer server(80);
 #else
   #define BMS_SERIAL Serial
 #endif
+#define MAGIC 0xA55A1234
+#define VERSION 1
+
+struct PersistData {
+  uint32_t magic;
+  uint16_t version;
+  uint32_t restartCount;
+};
 // OTA 配置（请替换为你的 WiFi 凭证）
 const char* ssid = "Your_WiFi_SSID";
 const char* password = "Your_WiFi_Password";
@@ -497,7 +505,7 @@ const char statusForm[] PROGMEM = R"rawliteral(
   <head>
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="5"> 
-    <title>BMS Status v1.1</title>
+    <title>BMS Status v1.3</title>
     <style>
       body { font-family: 'Segoe UI', Arial; margin: 20px; background: #fafafa; }
       .container { background: {{color}}; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; margin-bottom: 20px;}
@@ -610,18 +618,29 @@ void setup() {
     }
     restartCount = rtc_restart_count;
   #else
-    // ESP8266: 使用 EEPROM 持久化 32-bit 重启计数
-    EEPROM.begin(512);
-    uint32_t stored = 0;
-    EEPROM.get(0, stored);
-    String info = ESP.getResetInfo();
-    if (info.indexOf("wdt") != -1 || info.indexOf("WDT") != -1) {
-      stored++;
-      EEPROM.put(0, stored);
-      EEPROM.commit();
+    // ESP8266: 使用 EEPROM 持久化（带 Magic 校验）
+    EEPROM.begin(64);
+    PersistData data;
+    EEPROM.get(0, data);
+
+    // 判断是否为“我写的数据”
+    if (data.magic != MAGIC || data.version != VERSION) {
+      // 第一次运行 / 垃圾数据 / 旧版本
+      data.magic = MAGIC;
+      data.version = VERSION;
+      data.restartCount = 0;
+    } else {
+      String info = ESP.getResetInfo();
+      if (info.indexOf("wdt") != -1 || info.indexOf("WDT") != -1) {
+        data.restartCount++;
+      }
     }
-    restartCount = stored;
-  #endif
+
+  EEPROM.put(0, data);
+  EEPROM.commit();
+
+  restartCount = data.restartCount;
+#endif
 
   // 启用硬件看门狗（防止 MCU 死机导致继电器保持吸合）
   // ESP32 使用 esp_task_wdt，ESP8266 使用 ESP.wdtEnable
